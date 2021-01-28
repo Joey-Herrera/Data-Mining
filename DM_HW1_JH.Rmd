@@ -1,0 +1,86 @@
+---
+title: "DataMining-HW1"
+author: "Joey Herrera"
+date: "1/28/2021"
+output: pdf_document
+---
+
+```{r echo=FALSE}
+ggplot(data=GasPrices) +
+  geom_boxplot(aes(x=factor(Competitors), y=Price))
+```
+
+
+```{r echo=FALSE}
+ggplot(data=GasPrices) +
+  geom_point(aes(x=Income, y=Price))
+```
+
+```{r echo=FALSE}
+GasPrices.Brand = GasPrices %>%
+  group_by(Brand) %>%
+    summarize(mean_Price = mean(Price))
+
+ggplot(data=GasPrices.Brand) +
+  geom_col(mapping = aes(x=Brand, y=mean_Price))
+```
+
+
+```{r echo=FALSE}
+ggplot(data = GasPrices) +
+  geom_histogram(aes(x=Price), bins = 10) +
+  facet_wrap(~Stoplight)
+```
+
+```{r}
+ggplot(data=GasPrices) +
+  geom_boxplot(aes(x=Highway, y=Price))
+```
+
+```{r}
+bikeshare_total = bikeshare %>% 
+  group_by(hr) %>%
+  summarize(mean_total = mean(total))
+
+ggplot(data=bikeshare_total) +
+  geom_line(aes(x=hr, y=mean_total))
+```
+
+```{r}
+bikeshare_workingday = bikeshare %>% 
+  group_by(hr, workingday) %>%
+  summarize(mean_total = mean(total))
+
+ggplot(data=bikeshare_workingday) +
+  geom_line(aes(x=hr, y=mean_total)) +
+  facet_wrap(~workingday)
+```
+
+```{r}
+bikeshare_weather=bikeshare %>%
+  filter(hr==8)%>%
+  group_by(weathersit, workingday, hr) %>%
+  summarize(mean_total = mean(total))
+
+ggplot(data=bikeshare_weather) +
+  geom_col(aes(x=hr,y=mean_total)) +
+  facet_wrap(~weathersit)
+```
+
+```{r}
+ABIA_delay = ABIA %>%
+  filter(!is.na(ArrDelay)) %>%
+  filter(!is.na(DepDelay)) %>%
+  group_by(DayOfWeek, UniqueCarrier) %>%
+  summarize(mean_delay = mean(ArrDelay + DepDelay))
+
+ggplot(data=ABIA_delay) +
+  geom_line(aes(x=DayOfWeek, y=mean_delay)) +
+  facet_wrap(~UniqueCarrier)
+```
+
+
+
+
+
+

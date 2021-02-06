@@ -122,43 +122,56 @@ library(foreach)
 sclass=read_csv('/Users/josephherrera/desktop/ECO395M/data/sclass.csv')
 
 # Clean data for 350
-submodel = c('350')
-
 sclass_350 = sclass %>%
-  filter(trim %in% submodel) %>%
+  filter(trim == '350') %>%
   select(c('trim','price', 'mileage'))
 
 #Plot the data for 350
 ggplot(data = sclass_350) +
-  geom_point(aes(x=mileage, y=price)) +
-  facet_wrap(~trim)
+  geom_point(aes(x=mileage, y=price))
 
 #Create training and testing datasets
-sclass_split = initial_split(sclass_350, prop = 0.9)
-sclass_train = training(sclass_split)
-sclass_test = testing(sclass_split)
+k_grid = c(2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40)
 
-#KNN with k=3
-knn3 = knnreg(price ~ mileage, data = sclass_train, k=3) #In the caret package
-rmse = rmse(knn3, sclass_train)
-rmse
-
-#Plot the fit -> Attach predictions to the test data frame
-sclass_test = sclass_test %>%
-  mutate(sclass_pred = predict(knn3, sclass_test))
-
-p_test = ggplot(data = sclass_test) +
-  geom_point(mapping = aes(x=mileage, y=price), alpha = 0.2)
-p_test
-
-#Add predictions
-p_test + geom_line(aes(x=mileage, y=sclass_pred), color='red', size=1.5)
+rmse_out_350 = foreach(i=1:length(k_grid), .combine='rbind') %dopar% {
+sclass_split_350 = initial_split(sclass_350, prop = 0.9)
+sclass_train_350 = training(sclass_split_350)
+sclass_test_350 = testing(sclass_split_350)
+  this_rmse_350 = foreach(k = k_grid, .combine='c') %do% {
+    # train the model and calculate RMSE on the test set
+    knn_model = knnreg(price ~ mileage, data=sclass_test_350, k = k, use.all=TRUE)
+    modelr::rmse(knn_model, sclass_train_350)
+  }
+  data.frame(k=k_grid, rmse=this_rmse_350)
+}
+rmse_out_350 = arrange(rmse_out_350, k)
 
 ```
 
 ```{r echo=FALSE}
 #Plot RMSE versus K
-ggplot()
+ggplot(rmse_out_350) + geom_boxplot(aes(x=factor(k), y=rmse)) + theme_bw(base_size=7)
+```
+```{r echo=FALSE}
+knn10 = knnreg(price ~ mileage, data = sclass_train_350, k=10) #In the caret package
+rmse_350 = rmse(knn10, sclass_train_350)
+rmse_350 #RMSE in
+
+#Plot the fit -> Attach predictions to the test data frame
+sclass_test_350 = sclass_test_350 %>%
+  mutate(sclass_pred_350 = predict(knn10, sclass_test_350))
+
+p_test_350 = ggplot(data = sclass_test_350) +
+  geom_point(mapping = aes(x=mileage, y=price), alpha = 0.2)
+p_test_350
+
+#Add predictions
+p_test_350 + geom_line(aes(x=mileage, y=sclass_pred_350), color='red', size=1.5)
+
+#Calculate the RMSE out
+rmse_test_350 = rmse(knn10, sclass_test_350)
+rmse_test_350
+
 ```
 
 
@@ -166,40 +179,54 @@ ggplot()
 
 ```{r echo=FALSE}
 # Clean data for 63 AMG
-submodel = c('63 AMG')
-
 sclass_63AMG = sclass %>%
-  filter(trim %in% submodel) %>%
+  filter(trim == '63 AMG') %>%
   select(c('trim','price', 'mileage'))
 
-#Plot the data for 350
+#Plot the data for 63 AMG
 ggplot(data = sclass_63AMG) +
-  geom_point(aes(x=mileage, y=price)) +
-  facet_wrap(~trim)
+  geom_point(aes(x=mileage, y=price))
 
 #Create training and testing datasets
-sclass_split = initial_split(sclass_63AMG, prop = 0.9)
-sclass_train = training(sclass_split)
-sclass_test = testing(sclass_split)
+k_grid = c(2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50)
+rmse_out_63AMG = foreach(i=1:length(k_grid), .combine='rbind') %dopar% {
+sclass_split_63AMG = initial_split(sclass_63AMG, prop = 0.9)
+sclass_train_63AMG = training(sclass_split_63AMG)
+sclass_test_63AMG = testing(sclass_split_63AMG)
+  this_rmse_63AMG = foreach(k = k_grid, .combine='c') %do% {
+    # train the model and calculate RMSE on the test set
+    knn_model = knnreg(price ~ mileage, data=sclass_test_63AMG, k = k, use.all=TRUE)
+    modelr::rmse(knn_model, sclass_train_63AMG)
+  }
+  data.frame(k=k_grid, rmse=this_rmse_63AMG)
+}
+rmse_out_63AMG = arrange(rmse_out_63AMG, k)
+```
 
-#KNN with k=3
-knn3 = knnreg(price ~ mileage, data = sclass_train, k=3) #In the caret package
-rmse = rmse(knn3, sclass_train)
+```{r echo=FALSE}
+#Plot K versus RMSE for 63 AMG
+
+ggplot(rmse_out_63AMG) + geom_boxplot(aes(x=factor(k), y=rmse)) + theme_bw(base_size=7)
+
+```
+
+```{r echo=FALSE}
+#KNN with k=20
+knn20 = knnreg(price ~ mileage, data = sclass_train_63AMG, k=20) #In the caret package
+rmse = rmse(knn20, sclass_train_63AMG)
 rmse
 
 #Plot the fit -> Attach predictions to the test data frame
-sclass_test = sclass_test %>%
-  mutate(sclass_pred = predict(knn3, sclass_test))
+sclass_test_63AMG = sclass_test_63AMG %>%
+  mutate(sclass_pred = predict(knn20, sclass_test_63AMG))
 
-p_test = ggplot(data = sclass_test) +
+p_test_63AMG = ggplot(data = sclass_test_63AMG) +
   geom_point(mapping = aes(x=mileage, y=price), alpha = 0.2)
-p_test
+p_test_63AMG
 
 #Add predictions
-p_test + geom_line(aes(x=mileage, y=sclass_pred), color='red', size=1.5)
+p_test_63AMG + geom_line(aes(x=mileage, y=sclass_pred), color='red', size=1.5)
 ```
-
-
 
 
 

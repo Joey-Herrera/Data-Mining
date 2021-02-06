@@ -15,14 +15,18 @@ library(ggplot2)
 GasPrices=read_csv('/Users/josephherrera/desktop/ECO395M/data/GasPrices.csv')
 
 ggplot(data=GasPrices) +
-  geom_boxplot(aes(x=factor(Competitors), y=Price))
+  geom_boxplot(aes(x=factor(Competitors), y=Price)) +
+  xlab('Near Competitors') +
+  ylab('Price of Gas Per Gallon')
 ```
 The theory claiming as stations charge more if they lack direct competition in sight seems unplausible. I believe that gas stations will charge less for gas if they are near competitors because both gas stations are fighting for the same customers. As a result, they would try to lower gas prices below the competition to attract more customers. The boxplots show that gas stations tend to charge more money when competitors are not in sight. The first quartile is equivlent for gas stations pricing efforts regardless of if competitors are in sight. The mean and third quartile are greater for gas stations who are not near competitors than gas stations who are near gas stations.
 
 ### 1B
 ```{r echo=FALSE}
 ggplot(data=GasPrices) +
-  geom_point(aes(x=Income, y=Price))
+  geom_point(aes(x=Income, y=Price)) +
+  xlabs('Mean Income Per Area') +
+  ylabs('Price of Gas Per Gallon')
 ```
 The premise that richer areas charge more for gas has merit because real estate is more expensive in wealthy neighborhoods. Gas stations in wealthy areas would need to charge more to pay rent and keep their profit margins at an optimal level. The scatterplot suggests that there is little evidence to support the claim richer areas charge higher gas prices. Each area, regardless of the median income, seems to have varying prices charged for gas. In low-income areas gas prices can be similar to high-income areas at almost two dollars per gallon.Moderate-income areas see similar gas prices to the majority of low-income areas between 1.80 and 1.90 dollars.
 
@@ -33,7 +37,8 @@ GasPrices.Brand = GasPrices %>%
     summarize(mean_Price = mean(Price))
 
 ggplot(data=GasPrices.Brand) +
-  geom_col(mapping = aes(x=Brand, y=mean_Price))
+  geom_col(mapping = aes(x=Brand, y=mean_Price)) +
+  xlabs('Average Price of Gas Per Gallon')
 ```
 The theory that Shell charges more for the same type of gas seems unplausible (assuming ceteris paribus) because customers would not buy gas from Shell unless no other gas stations were in driving distance. This theory is unsupported by the data. The bar plots indicate that Shell charges comparable prices to every other gas station for a gallon of gas on average. Shell and Cheveron-Texaco seem to charge identical prices and the rest of the gas stations charge slightly less on average.
 
@@ -41,14 +46,18 @@ The theory that Shell charges more for the same type of gas seems unplausible (a
 ```{r echo=FALSE}
 ggplot(data = GasPrices) +
   geom_histogram(aes(x=Price), bins = 10) +
-  facet_wrap(~Stoplight)
+  facet_wrap(~Stoplight) +
+  xlab('Price of Gas Per Gallon') +
+  ylab('Frequency')
 ```
 Gas stations that are near stoplights charging more money seems plausible because the increase in price can be seen as a convieenence fee. There are fewer gas stations around stoplights than there are gas stations near stoplights. The histogram for gas stations not near stoplights have a higher proportion of gas stations charging over $1.80 per gallon than gas stations close to stoplights. The majority of gas stations close to stoplights charge less than 1.80 dollars per gallon. In conclusion, the figure does not support the claim that gas stations near stoplights charge more for gas than gas stations not near a stoplight.
 
 ### 1E
 ```{r echo=FALSE}
 ggplot(data=GasPrices) +
-  geom_boxplot(aes(x=Highway, y=Price))
+  geom_boxplot(aes(x=Highway, y=Price)) +
+  xlab('Highway Access') +
+  ylab('Price of Gas Per Gallon')
 ```
 I believe that gas stations with highway access charge more than other gas stations because of convenience. The boxplot for gas stations without highway access has a first, second, and third quartile that are lower than gas stations with highway access. Gas stations with highway access have a third quartile that is approximately 10 cents greater than other gas stations. The mean price of gas per gallon at gas stations with highway access is about 5 cents greater than other gas stations. In conclusion, the boxplots support the claim that gas stations with highway access charge more than other gas stations.
 
@@ -74,7 +83,9 @@ bikeshare_workingday = bikeshare %>%
 
 ggplot(data=bikeshare_workingday) +
   geom_line(aes(x=hr, y=mean_total)) +
-  facet_wrap(~workingday)
+  facet_wrap(~workingday) +
+  xlab('Hour') +
+  ylab('Mean Number of Bike Rentals')
 ```
 The two line graphs depict the average number of bike rentals per hour during days in the work week and on the weekend. The line graphs plot hour of day the x-axis, starting with 0 and ending with 23. The y-axis plots the average number of bike rentals. These line graphs illustrate that most rentals during the work week occur before and after the typical work day, and that bike rental numbers spike during mid-day on weekends.
 
@@ -87,7 +98,9 @@ bikeshare_weather=bikeshare %>%
 
 ggplot(data=bikeshare_weather) +
   geom_col(aes(x=hr,y=mean_total)) +
-  facet_wrap(~weathersit)
+  facet_wrap(~weathersit) +
+  xlab('Hour') +
+  ylab('Mean Number of Bike Rentals')
 ```
 The plot above illustrates the average total of bike rentals per weekday on the y-axis. The x-axis depicts the hour of the day, and each barplot represents a different weather situation. When weather situation equals 1 there is nice weather. When weather situation equals two there is mist and clouds. Finally, weather situation equals three when there is light snow, light rain, or a thunderstorm. The barplots illustrate that on average most bike rentals at 8 am on a workday with clear weather, followed closely by misting weather and there is a substancial decrease in bike rentals when there is significant percipitation.
 
@@ -103,7 +116,9 @@ ABIA_delay = ABIA %>%
 
 ggplot(data=ABIA_delay) +
   geom_line(aes(x=DayOfWeek, y=mean_delay)) +
-  facet_wrap(~UniqueCarrier)
+  facet_wrap(~UniqueCarrier) +
+  xlab('Day Of the Week') +
+  ylab('Mean Depature Delay in Minutes')
 ```
 
 The plots above depict the average delay time on the y-axis and the day of the week on the x-axis, where 1 equals Monday, 2 equals Tuesday, etc. Each line graph depicts a different airline. Most of the airlines have small differences in departure delays regardless of the day of the week. The only airlines of interest are EV, MQ, and NW. If you fly NW you should avoid flying on a Tuesday, Wednesday, or Thursday. If you are flying on EV or MQ you should also avoid mid-week days. You should also avoid flying EV on Sunday.

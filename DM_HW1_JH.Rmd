@@ -25,8 +25,8 @@ The theory claiming as stations charge more if they lack direct competition in s
 ```{r echo=FALSE}
 ggplot(data=GasPrices) +
   geom_point(aes(x=Income, y=Price)) +
-  xlabs('Mean Income Per Area') +
-  ylabs('Price of Gas Per Gallon')
+  xlab('Mean Income Per Area') +
+  ylab('Price of Gas Per Gallon')
 ```
 The premise that richer areas charge more for gas has merit because real estate is more expensive in wealthy neighborhoods. Gas stations in wealthy areas would need to charge more to pay rent and keep their profit margins at an optimal level. The scatterplot suggests that there is little evidence to support the claim richer areas charge higher gas prices. Each area, regardless of the median income, seems to have varying prices charged for gas. In low-income areas gas prices can be similar to high-income areas at almost two dollars per gallon.Moderate-income areas see similar gas prices to the majority of low-income areas between 1.80 and 1.90 dollars.
 
@@ -38,7 +38,7 @@ GasPrices.Brand = GasPrices %>%
 
 ggplot(data=GasPrices.Brand) +
   geom_col(mapping = aes(x=Brand, y=mean_Price)) +
-  xlabs('Average Price of Gas Per Gallon')
+  xlab('Average Price of Gas Per Gallon')
 ```
 The theory that Shell charges more for the same type of gas seems unplausible (assuming ceteris paribus) because customers would not buy gas from Shell unless no other gas stations were in driving distance. This theory is unsupported by the data. The bar plots indicate that Shell charges comparable prices to every other gas station for a gallon of gas on average. Shell and Cheveron-Texaco seem to charge identical prices and the rest of the gas stations charge slightly less on average.
 
@@ -148,18 +148,24 @@ ggplot(data = sclass_350) +
 #Create training and testing datasets
 k_grid = c(2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40)
 
+sclass_split_350 = initial_split(sclass_350, prop = 0.9)
+sclass_train_350 = training(sclass_split_350)
+sclass_test_350 = testing(sclass_split_350)
+
 rmse_out_350 = foreach(i=1:length(k_grid), .combine='rbind') %dopar% {
 sclass_split_350 = initial_split(sclass_350, prop = 0.9)
 sclass_train_350 = training(sclass_split_350)
 sclass_test_350 = testing(sclass_split_350)
   this_rmse_350 = foreach(k = k_grid, .combine='c') %do% {
     # train the model and calculate RMSE on the test set
-    knn_model = knnreg(price ~ mileage, data=sclass_test_350, k = k, use.all=TRUE)
-    modelr::rmse(knn_model, sclass_train_350)
+    knn_model = knnreg(price ~ mileage, data=sclass_train_350, k = k, use.all=TRUE)
+    modelr::rmse(knn_model, sclass_test_350)
   }
   data.frame(k=k_grid, rmse=this_rmse_350)
 }
 rmse_out_350 = arrange(rmse_out_350, k)
+
+this_rmse_350
 
 ```
 
@@ -193,55 +199,66 @@ rmse_test_350
 
 
 ```{r echo=FALSE}
-# Clean data for 63 AMG
-sclass_63AMG = sclass %>%
-  filter(trim == '63 AMG') %>%
+# Clean data for 65 AMG
+sclass_65AMG = sclass %>%
+  filter(trim == '65 AMG') %>%
   select(c('trim','price', 'mileage'))
 
-#Plot the data for 63 AMG
-ggplot(data = sclass_63AMG) +
+#Plot the data for 65 AMG
+ggplot(data = sclass_65AMG) +
   geom_point(aes(x=mileage, y=price))
 
 #Create training and testing datasets
-k_grid = c(2, 4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50)
-rmse_out_63AMG = foreach(i=1:length(k_grid), .combine='rbind') %dopar% {
-sclass_split_63AMG = initial_split(sclass_63AMG, prop = 0.9)
-sclass_train_63AMG = training(sclass_split_63AMG)
-sclass_test_63AMG = testing(sclass_split_63AMG)
-  this_rmse_63AMG = foreach(k = k_grid, .combine='c') %do% {
+k_grid = c(2, 4, 6, 8, 10, 15, 20, 25, 30, 35)
+
+sclass_split_65AMG = initial_split(sclass_65AMG, prop = 0.9)
+sclass_train_65AMG = training(sclass_split_65AMG)
+sclass_test_65AMG = testing(sclass_split_65AMG)
+
+rmse_out_65AMG = foreach(i=1:length(k_grid), .combine='rbind') %dopar% {
+sclass_split_65AMG = initial_split(sclass_65AMG, prop = 0.9)
+sclass_train_65AMG = training(sclass_split_65AMG)
+sclass_test_65AMG = testing(sclass_split_65AMG)
+  this_rmse_65AMG = foreach(k = k_grid, .combine='c') %do% {
     # train the model and calculate RMSE on the test set
-    knn_model = knnreg(price ~ mileage, data=sclass_test_63AMG, k = k, use.all=TRUE)
-    modelr::rmse(knn_model, sclass_train_63AMG)
+    knn_model = knnreg(price ~ mileage, data=sclass_train_65AMG, k = k, use.all=TRUE)
+    modelr::rmse(knn_model, sclass_test_65AMG)
   }
-  data.frame(k=k_grid, rmse=this_rmse_63AMG)
+  data.frame(k=k_grid, rmse=this_rmse_65AMG)
 }
-rmse_out_63AMG = arrange(rmse_out_63AMG, k)
+rmse_out_65AMG = arrange(rmse_out_65AMG, k)
+
+this_rmse_65AMG
 ```
 
 ```{r echo=FALSE}
-#Plot K versus RMSE for 63 AMG
+#Plot K versus RMSE for 65 AMG
 
-ggplot(rmse_out_63AMG) + geom_boxplot(aes(x=factor(k), y=rmse)) + theme_bw(base_size=7)
+ggplot(rmse_out_65AMG) + geom_boxplot(aes(x=factor(k), y=rmse)) + theme_bw(base_size=7)
 
 ```
 
 ```{r echo=FALSE}
-#KNN with k=20
-knn20 = knnreg(price ~ mileage, data = sclass_train_63AMG, k=20) #In the caret package
-rmse = rmse(knn20, sclass_train_63AMG)
-rmse
+#KNN with k=6
+knn6 = knnreg(price ~ mileage, data = sclass_train_65AMG, k=6) #In the caret package
+rmse_65AMG = rmse(knn6, sclass_train_65AMG)
+rmse_65AMG
 
 #Plot the fit -> Attach predictions to the test data frame
-sclass_test_63AMG = sclass_test_63AMG %>%
-  mutate(sclass_pred = predict(knn20, sclass_test_63AMG))
+sclass_test_65AMG = sclass_test_65AMG %>%
+  mutate(sclass_pred = predict(knn15, sclass_test_65AMG))
 
-p_test_63AMG = ggplot(data = sclass_test_63AMG) +
+p_test_65AMG = ggplot(data = sclass_test_65AMG) +
   geom_point(mapping = aes(x=mileage, y=price), alpha = 0.2)
-p_test_63AMG
+p_test_65AMG
 
 #Add predictions
-p_test_63AMG + geom_line(aes(x=mileage, y=sclass_pred), color='red', size=1.5)
+p_test_65AMG + geom_line(aes(x=mileage, y=sclass_pred), color='red', size=1.5)
+
+#Calculate the RMSE out
+rmse_test_65AMG = rmse(knn6, sclass_test_65AMG)
+rmse_test_65AMG
 ```
 
-
+The Mercedes S-class 350 has the larger optimal value of K. This is because there are more obersvations of the 350 trim in the S-class dataset. More observations per trim allows the optimal value of K to be higher before significantly biasing the model.
 

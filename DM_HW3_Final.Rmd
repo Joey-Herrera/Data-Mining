@@ -1,0 +1,354 @@
+---
+title: "Data_Mining_HW3_P1"
+author: "Joey Herrera"
+date: "3/27/2021"
+output: pdf_document
+---
+# Data Mining Assignment 3
+
+### Question 1: What causes what?
+
+1.1 Why can’t I just get data from a few different cities and run the regression of “Crime” on “Police” to understand how more cops in the streets affect crime? (“Crime” refers to some measure of crime rate and “Police” measures the number of cops in a city.)
+
+Answer: You can not just obtain data from a few different cities and run a regression of crime on police to understand how more cops in the streets affect crime. Various other factors might have a causal effect on the crime and police variables. These unobserved variables could cause the change in crime and police. Therefore, a regression of crime on police would be based on the correlation of the two variables. For instance, if only one city consistently has massive protests, there will be an increase in police, but there might be fewer citizens on the streets because they are scared of the mob. In this case, there would be a smaller number of victims on the street for criminals to target. As a result, the protest causes both an increase in the number of police and a decrease in the crime rate simultaneously. The other cities in the data most likely have other significant circumstances where the number of police in each city varies from day to day. Thus, comparing cities to one another without controlling for these unobserved factors will invalidate the final results.
+
+1.2 How were the researchers from UPenn able to isolate this effect? Briefly describe their approach and discuss their result in the “Table 2”, from the researchers' paper.
+
+Answer: Researches from the University of Pennsylvania were able to isolate the effect of the number of police in a city on the crime rate in Washington D.C. by focusing on days where the fear of terrorism was significant. The researches focused on days labeled orange or above, which translates to days where a terrorism event is more likely to occur. As a result, more police are dispatched through the capital. Controlling for the level of terror on a given day allows the researchers to ensure that there would be an increased number of police in the city throughout that particular set of days. In Table 2, the first regression shows that the increase of police in the city on high alert days corresponds to approximately a 7.3% decrease in the crime rate with a 5% significance level. The second regression in Table 2 controls for midday ridership, which causes a less significant reduction in crime on high alert days. In the second regression, the high alert variable decreases the crime rate by approximately 6% at a 5% significance rate. Thus, midday ridership has a significant effect on the crime rate. Higher levels of midday ridership equate to an increased number of potential victims on the street.
+
+1.3 Why did they have to control for Metro ridership? What was that trying to capture?
+
+Answer: The researchers at UPenn controlled for Metro ridership to account for the possible lower number of people out in the city during high threat days. Controlling for Metro ridership captures the number of potential victims in the city during the day, which provides value because that number can be compared to Metro ridership on any other given day where there is no high alert. Days where Washington D.C. is not on high alert serve as a baseline for the regular number of police in the city and the typical amount of civilians riding the Metro midday.
+
+1.4 Below I am showing you "Table 4" from the researchers' paper. Just focus on the first column of the table. Can you describe the model being estimated here? What is the conclusion?
+
+Answer: The first regression in Table 4 is estimating the effect District 1 and Other Districts have on the crime rate while holding the high alert variable constant and controlling for midday Metro ridership compared to low alert days. The first column in Table 4 concludes that the increase in police caused by a high alert day in Washington D.C. in District 1 decreases the crime rate by approximately 2.6%. This result is significant at the 1% level. Thus, the increase of police on a high alert day in District 1 significantly decreases the crime rate.
+
+### Question 2: Predictive model building - green certification
+Your goal is to build the best predictive model possible for revenue per square foot per calendar year, and to use this model to quantify the average change in rental income per square foot (whether in absolute or percentage terms) associated with green certification, holding other features of the building constant. Note that revenue per square foot per year is the product of two terms: rent and leasing_rate! This reflects the fact that, for example, high-rent buildings with low occupancy may not actually bring in as much revenue as lower-rent buildings with higher occupancy.
+
+The purpose of this writeup is to identify the difference in revenue per square foot per year for buildings that have a green certification versus buildings that do not. Predicting the difference in revenue per square foot per year allows for the comparison of money made for buildings with relevant leasing levels depending on whether they have green certification.
+
+The data used to evaluate this problem is a set of 7,820 buildings split into clusters with at least one green-certified building and one non-certified building. In this dataset, other relevant indicators of revenue include the number of stories, age of the building, and if it has been recently renovated. Before creating a predictive model for revenue per square foot per year, I had to create the variable (revenue) using the product of the leasing rate and rent price for each building. Next, I decided to fit a single tree model for revenue with all of the indicators included as a base model. Creating this tree model gives me a baseline to compare the accuracy of future models with. Next, I fit a random forest model to the training data, consisting of 80% of the total observations. Finally, I predict the revenue per square foot per year for the remaining 20% of the data and compare the random forest model's out-of-sample accuracy to the single tree model via comparing RMSEs.
+
+```{r echo=FALSE, message=FALSE, include=FALSE}
+#Load in relevant libraries for predictive modeling
+library(tidyverse)
+library(tidyr)
+library(ggplot2)
+library(gamlr) #lasso
+library(foreach) #loops
+library(doMC)
+library(scales)
+
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(rsample) #for train/ test split
+library(tidyverse)
+library(dplyr)
+
+#Load in Green buildings data
+green_buildings = read_csv("/Users/josephherrera/Desktop/ECO395M/data/greenbuildings.csv")
+```
+```{r echo=FALSE}
+#Create the revenue per square foot per calendar year variable
+#Product of rent and leasing rate
+green_buildings = green_buildings %>%
+  mutate(revenue = Rent*leasing_rate)
+
+#filter out any NA in the data
+green_buildings = green_buildings %>%
+  filter(!is.na(empl_gr))
+```
+```{r echo = FALSE}
+#Create a predictive model using a random forest technique 
+#Create train test split for the green buildings data
+gb_split = initial_split(green_buildings, prop = 0.8)
+gb_train = training(gb_split)
+gb_test = testing(gb_split)
+
+# let's fit a single tree
+gb_tree = rpart(revenue ~ . - LEED - Energystar - Rent - leasing_rate,
+                  data=gb_train, control = rpart.control(cp = 0.00001))
+#plot(gb_tree)
+
+#Fit a random forest 
+load.forest = randomForest(revenue ~ . - LEED - Energystar - Rent - leasing_rate,
+                           data=gb_train, importance = TRUE)
+
+# shows out-of-bag MSE as a function of the number of trees used
+#plot(load.forest)
+
+# let's compare RMSE on the test set
+modelr::rmse(gb_tree, gb_test)
+modelr::rmse(load.forest, gb_test)  # a lot lower!
+
+
+```
+
+The root mean squared error from the random forest model is consistently approximately 200 dollars of revenue per square foot per year more accurate than the single tree model. 
+
+```{r echo=FALSE}
+#plot predictions versus revenuw
+yhat_test = predict(load.forest, gb_test)
+plot(yhat_test, gb_test$revenue)
+
+#Plot variable importance plot
+varImpPlot(load.forest, type=1)
+```
+
+
+The variable importance plot above illustrates that a building's green rating does not have as significant an impact on the RMSE as most other variables in the random forest model. As a result, green rating is not a good predictor of revenue per square foot per year.
+
+
+```{r echo = FALSE, message = FALSE, warning=FALSE}
+#Create a plot comparing the revenue for green ceritified buildings versus those whomst not
+#green_cert = gb_test %>%
+ # group_by(green_rating) %>%
+  #summarise(yhat_rev = mean(revenue))
+  
+
+
+#ggplot(green_cert) +
+ #geom_col(aes(x=green_rating, y=yhat_rev)) +
+  #xlab("Leasing Rate") +
+  #ylab("Revenue") +
+#  ggtitle("Revenue Per Square Foot Per Year versus Leasing Rate")
+
+#print(green_cert)
+  
+```
+
+```{r echo=FALSE}
+#Add predictions to the optimal random forest model
+predicted_yearly_rev_test = predict(load.forest, gb_test)
+
+gb_test$predicted_yearly_rev = predicted_yearly_rev_test
+
+gb_test$predicted_yearly_rev = unlist(predicted_yearly_rev_test)
+
+test_sum = gb_test %>%
+  group_by(green_rating) %>%
+  summarise(yhat_mean = mean(predicted_yearly_rev))
+
+test_sum$yhat_mean = unlist(test_sum$yhat_mean)
+
+#Plot partial plot for green rating
+partialPlot(load.forest, as.data.frame(gb_test), 'green_rating', las=1)
+
+
+```
+
+The partial dependence plot above shows the return for revenue per square foot per year for any green rating, holding all other variables constant. The plot depicts that green rating only accounts for about 60 dollars of revenue per square foot per year.
+
+```{r echo=FALSE, warning=FALSE}
+
+
+ggplot(data=test_sum) + 
+  geom_col(mapping=aes(x=green_rating, y=yhat_mean)) +
+  scale_x_discrete("green_rating", limits =0:1)+ 
+  labs(title = "Yearly Revenue for non-rated vs Green-rated Buildings",
+      subtitle = "random forest model",
+      x = "Green Rating?", y = "Predicted Yearly Revenue per Square Foot")
+
+print(test_sum)
+```
+
+The bar chart above displays a 200 dollar per square foot per year difference between buildings with a green rating and non-rated buildings. This difference is caused by the green rating variable and a combination of other factors correlated with the green rating variable.
+
+Revenue per square foot per year for buildings with a green certification consistently is higher than buildings without a green certification. In conclusion, I recommend that the building owner weigh the cost of renovating to obtain a green certification versus the predicted yearly revenue per square foot and make their decision accordingly. 
+
+### Question 3: Predictive Model Building - California Housing
+Your task is to build the best predictive model you can for medianHouseValue, using the other available features. Write a short report detailing your methods. Make sure your report includes an estimate for the overall out-of-sample accuracy of your proposed model.
+
+The goal of this writeup is to accuractely predict the median housing value for homes in California by census tract. Accurately predicting median housing values allows for predicting future housing values.
+
+The available dataset includes observations of California's median housing values based on different census tracts, which are determined through each tract's unique latitude and longitude coordinates. This dataset includes other relevant housing value indicators such as the total number of bedrooms and population in each census tract. Before creating predictive models, I standardized the total number of rooms by dividing by the number of households in each census tract. The new units for the totalRooms variable are rooms per household in a given tract. To begin creating the best predictive model, I fit a baseline linear model for median housing value using only the main factors. Next, I used a step function to determine a more optimal combination of main factors, pairwise interactions, and polynomials. Finally, I compared the baseline model's RMSE to the stepwise function's RMSE.
+```{r message=FALSE, echo= FALSE}
+#Load in California Housing data
+California_housing = read_csv("/Users/josephherrera/Desktop/ECO395M/data/CAhousing.csv")
+```
+```{r echo=FALSE}
+# Standardize totalRooms by households
+California_housing = California_housing %>%
+  mutate(totalRooms = totalRooms/households)
+# Create the baseline model using a full model 
+# Create train/ test split
+CAhousing_split = initial_split(California_housing, prop = 0.8)
+CAhousing_train = training(CAhousing_split)
+CAhousing_test = testing(CAhousing_split)
+
+full_CAhousing = lm(medianHouseValue ~ ., CAhousing_train)
+
+#Calculate out-of-sample RMSE
+#modelr::rmse(full_CAhousing, CAhousing_test)
+
+
+```
+```{r echo=FALSE, message=FALSE, include=FALSE}
+library(ggmap)
+
+#### Create a predictive model using the step function
+# baseline medium model with 11 main effects
+lm_baseline = lm(medianHouseValue ~ ., data=California_housing)
+
+# Use the step function and the baseline model to find the optimal model that includes interaction variables.
+lm_step = step(lm_baseline, 
+			scope=~(.)^2)
+
+# what variables are included?
+getCall(lm_step)
+coef(lm_step)
+
+# All variables for optimal lm model
+optimal_CAhousing = lm(formula = medianHouseValue ~ longitude + latitude + housingMedianAge + 
+    totalRooms + totalBedrooms + population + households + medianIncome + 
+    housingMedianAge:totalBedrooms + housingMedianAge:population + 
+    totalRooms:population + latitude:housingMedianAge + longitude:housingMedianAge + 
+    totalBedrooms:medianIncome + population:medianIncome + totalRooms:medianIncome + 
+    households:medianIncome + housingMedianAge:households + latitude:households + 
+    totalRooms:households + totalBedrooms:households + population:households + 
+    longitude:latitude + totalRooms:totalBedrooms + latitude:medianIncome + 
+    longitude:medianIncome + latitude:population + longitude:population + 
+    longitude:households + latitude:totalBedrooms, data = California_housing)
+
+# Compare out-of-sample performance using RMSE
+rmse = function(y, yhat) {
+  sqrt( mean( (y - yhat)^2 ) )} ####How does this get read in???
+  
+# Create train/ test split
+#n = nrow(California_housing)
+#n_train = round(0.8*n) #round to the nearest integer (second arguement = 0 by default)
+#n_test = n - n_train
+# Create loop to compare 
+#rmse_vals = do(100)*{
+  
+  # re-split into train and test cases with the same sample sizes
+ # train_cases = sample.int(n, n_train, replace=FALSE)
+  #test_cases = setdiff(1:n, train_cases)
+  #optimal_train = California_housing[train_cases,]
+  #optimal_test = California_housing[test_cases,]
+  
+  # Fit to the training data
+  # use `update` to refit the same model with a different set of data
+  #lm1 = update(lm_baseline, data=optimal_train)
+  #lm2 = update(lm_step, data=optimal_train)
+  
+  # Predictions out of sample
+  #yhat_test1 = predict(lm1, optimal_test)
+  #yhat_test2 = predict(lm2, optimal_test)
+  
+  #c(rmse(optimal_test$medianHouseValue, yhat_test1),
+   # rmse(optimal_test$medianHouseValue, yhat_test2))
+#}
+###
+California_housing_split = initial_split(California_housing, prop = 0.8)
+California_housing_train= training(California_housing_split)
+California_housing_test = testing(California_housing_split)
+
+rmse_out_lm = foreach(i=1:100, .combine='rbind') %dopar% {
+California_housing_split = initial_split(California_housing, prop = 0.8)
+California_housing_train= training(California_housing_split)
+California_housing_test = testing(California_housing_split)
+    # train the model and calculate RMSE on the test set
+ this_rmse_lm = lm(formula = medianHouseValue ~ longitude + latitude + housingMedianAge + 
+    totalRooms + totalBedrooms + population + households + medianIncome + 
+    housingMedianAge:totalBedrooms + housingMedianAge:population + 
+    totalRooms:population + latitude:housingMedianAge + longitude:housingMedianAge + 
+    totalBedrooms:medianIncome + population:medianIncome + totalRooms:medianIncome + 
+    households:medianIncome + housingMedianAge:households + latitude:households + 
+    totalRooms:households + totalBedrooms:households + population:households + 
+    longitude:latitude + totalRooms:totalBedrooms + latitude:medianIncome + 
+    longitude:medianIncome + latitude:population + longitude:population + 
+    longitude:households + latitude:totalBedrooms, data = California_housing_train)
+    modelr::rmse(this_rmse_lm, California_housing_test)
+}
+
+
+# Add predictions to optimal test dataframe
+optimal_test_pred = California_housing_test %>%
+  mutate(yhat = predict(optimal_CAhousing, California_housing_test)) 
+
+# Add errors to optimal test dataframe
+optimal_test_rmse = optimal_test_pred %>%
+  group_by(longitude, latitude, medianHouseValue, yhat) %>% 
+  summarise(rmse = {sqrt( mean( (medianHouseValue - yhat)^2 ) )})
+
+
+```
+```{r echo=FALSE}
+# noticeable improvement over the starting point!
+mean(rmse_out_lm)
+modelr::rmse(full_CAhousing, CAhousing_test)
+```
+
+```{r echo=FALSE, include=FALSE, message=FALSE}
+# Look into mapping funcation
+#install.packages("ggmap")
+library(ggmap)
+#install.packages("mapview")
+#library(mapview)
+library(devtools)
+#install.packages("remote")
+
+#After setting up Google Cloud account be sure to enable the Static Map API
+
+# Get most recent version of ggmap
+#devtools::install_github("dkahle/ggmap")
+
+register_google(key = "AIzaSyAjkDSo46ErG1uW3z-sMgFK_Uh3wGrwOE8", write = T) # write = T so we remember the key
+
+has_google_key()
+google_key()
+has_google_client()
+has_google_signature()
+
+California_map <- get_googlemap(center = c(lon = -122, lat = 38), zoom = 7, size = c(640,640), scale = 2)
+ggmap(California_map)
+# zoom = 7 seems to be the best level of zoom to get the map of Cali in the image.
+```
+
+The RMSE for the stepwise function consistently outperformed the baseline model by approximately 6000 dollars closer to the actual housing price. To further visualize the map below's data is by plotting the median house value for each census tract in California. The map below illustrates the rise in median house value the closer the house is to the ocean.
+
+```{r echo=FALSE, warning=FALSE}
+#Map 1: a plot of the original data, using a color scale to show medianHouseValue (or log medianHouseValue) versus longitude (x) and latitude (y).
+ggmap(California_map) +
+  geom_point(data = California_housing, aes(x = longitude, y = latitude, color = medianHouseValue), size = 1) +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Median Housing Values in California by Census Tract") +
+  labs(color = "Median House Value") +
+  scale_color_continuous(limits= c(0, 700000), labels = comma)
+
+
+```
+\newpage
+The next plot shows the stepwise function's predictions on the 20% of the test set data. The plot below depicts the same trend as the plot above. The median housing value rises the closer a home is to the ocean.
+
+```{r echo=FALSE, warning=FALSE}
+#Map 2: a plot of your model's predictions of medianHouseValue (or log medianHouseValue) versus longitude (x) and latitude (y).
+ggmap(California_map) +
+  geom_point(data = optimal_test_pred, aes(x = longitude, y = latitude, color = yhat)) +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Median Housing Values Predictions in California by Census Tract") +
+  labs(color = "Predictions") +
+  scale_color_continuous(limits= c(0, 600000), labels = comma)
+
+```
+\newpage
+The third and final plot depicts the RMSE for each observation in the test set. The RMSE varies regardless of location and includes grey points, which have an RMSE so large it is an outlier. The error seems to be randomly distributed among census tracts. Thus, the error does not impact the trend that median house values in California rise the closer the census tract is to the ocean.
+
+```{r echo=FALSE, warning=FALSE}
+#Map 3: a plot of your model's errors/residuals (or log residuals) versus longitude (x) and latitude (y).
+ggmap(California_map) +
+  geom_point(data = optimal_test_rmse, aes(x = longitude, y = latitude, color = rmse))  +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  ggtitle("Predictive Error in California by Census Tract") +
+  labs(color = "RMSE") +
+  scale_color_continuous(limits= c(0, 150000), labels = comma)
+```
+
+In conclusion, in California, the closer the census tract is to the ocean, the higher the median home value. For potential home owners looking to buy a house in California, I recommend, taking distance from the ocean in to consideration when thinking about housing prices.

@@ -1,0 +1,593 @@
+---
+title: "Data Mining HW4"
+author: "Joey Herrera"
+date: "4/25/2021"
+output: pdf_document
+---
+# Data Mining Assignment #4
+
+### Question 1: Run both PCA and a clustering algorithm of your choice on the 11 chemical properties (or suitable transformations thereof) and summarize your results. Which dimensionality reduction technique makes more sense to you for this data? Convince yourself (and me) that your chosen method is easily capable of distinguishing the reds from the whites, using only the "unsupervised" information contained in the data on chemical properties. Does your unsupervised technique also seem capable of distinguishing the higher from the lower quality wines?
+
+```{r setup, include=FALSE}
+#load relevant packages
+library(ggplot2)
+library(mvtnorm) # for min distance clustering
+library(LICORS)  # for kmeans++
+library(foreach)
+library(mosaic)
+library(utils) # for txt data
+library(randomForest)
+library(tidyverse)
+#load wine.csv
+wine = read.csv("/Users/josephherrera/Desktop/ECO395M/data/wine.csv")
+
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+# Reduce the dimensions of the 11 elements down to 2 in order to be able to visualize the data on a 2-D plot
+# PCA
+X = wine[,-(12:13)] # Take out the supervised outcome 
+X = scale(X, center=TRUE, scale=TRUE) # standardize the distance to not have units
+
+# Extract the centers and scales from the rescaled data (which are named attributes)
+mu = attr(X,"scaled:center") # mean
+sigma = attr(X,"scaled:scale")
+# Compare these random projections to the first PC
+pc_Z = prcomp(X, rank=2)
+
+# the principal components themselves are in the "rotation" component
+# synonym: loadings
+loadings = pc_Z$rotation
+scores = pc_Z$x
+#v_try #compare with our "guess and check" PC
+# Note: the principal components are not identified up to sign
+# so we can negate the whole vector and get the same subspace
+
+# How much of the variation does this first principal component predict?
+summary(pc_Z)
+
+# what about the 1D summaries themselves?
+# I usually call these "scores"
+# each entry here is v dot x,
+# where v is PC1 and x is the original 2D data point
+pc_Z$x
+
+qplot(scores[,1], scores[,2], color=wine$color, xlab='Component 1', ylab='Component 2')
+
+
+# make color a binary variable red = 1 and white = 0
+wine = wine %>%
+  mutate(color = ifelse(color == "red",1,0))
+# Find the RMSE for the PCA method
+wine_combined = data.frame(wine, pc_Z$x)
+
+train_frac = 0.8
+N = nrow(wine_combined)
+N_train = floor(train_frac*N)
+N_test = N - N_train
+train_ind = sample.int(N, N_train, replace = F) %>% sort
+wine_train = wine_combined[train_ind,]
+wine_test = wine_combined[-train_ind,]
+
+
+forest_color = randomForest(color ~ PC1 + PC2, data = wine_train)
+
+yhat_forest_color = predict(forest_color, wine_test)
+mean((yhat_forest_color - wine_test$color)^2) %>% sqrt
+#0.03323506
+
+```
+
+
+
+```{r echo=FALSE, warning=FALSE}
+# Run min linkage
+# Center and scale the data
+X = wine[,-(12:13)] # Take out the supervised outcome 
+X = scale(X, center=TRUE, scale=TRUE) # standardize the distance to not have units
+
+# Extract the centers and scales from the rescaled data (which are named attributes)
+mu = attr(X,"scaled:center") # mean
+sigma = attr(X,"scaled:scale") # Find the variance
+
+# First form a pairwise distance matrix
+#distance_between_wine = dist(X)
+
+# Now run hierarchical clustering
+#h1 = hclust(distance_between_wine, method='centroid')
+
+# Cut the tree into 10 clusters
+#cluster1 = cutree(h1, k=2)
+#summary(factor(cluster1))
+
+# Using kmeans++ initialization
+clust2 = kmeanspp(X, k=2, nstart=25)
+
+clust2$center[1,]*sigma + mu
+clust2$center[2,]*sigma + mu
+#clust2$center[4,]*sigma + mu
+
+# Which cars are in which clusters?
+which(clust2$cluster == 1)
+which(clust2$cluster == 2)
+#which(clust2$cluster == 3)
+
+length(which(clust2$cluster == 1)) # 4854
+length(which(clust2$cluster == 2)) # 1643
+
+# The actual divide of white and red wine
+sum(wine$color == "white") # 4898
+sum(wine$color == "red") # 1599
+```
+
+
+Question 2: Market Segmentation
+Your task to is analyze this data as you see fit, and to prepare a (short!) report for NutrientH20 that identifies any interesting market segments that appear to stand out in their social-media audience. You have complete freedom in deciding how to pre-process the data and how to define "market segment." (Is it a group of correlated interests? A cluster? A principal component? Etc. You decide the answer to this question---don't ask me!) Just use the data to come up with some interesting, well-supported insights about the audience and give your client some insight as to how they might position their brand to maximally appeal to each market segment.
+```{r echo=FALSE, include=FALSE}
+social_marketing = read.csv("/Users/josephherrera/Desktop/ECO395M/data/social_marketing.csv")
+```
+
+```{r echo=FALSE, warning=FALSE}
+# Recraft the unqiue identifer varaible X to a numeric variable sos I can run PCA
+social_marketing$ID <- seq.int(nrow(social_marketing))
+# Take out the string unique identifier variable X
+social_trim = social_marketing[,-1]
+
+social_trim$chatter<- NULL
+social_trim$spam <- NULL
+social_trim$adult <- NULL
+social_trim$photo_sharing <- NULL 
+social_trim$health_nutrition <- NULL 
+
+X = scale(social_trim, center = T, scale = T)
+# Using kmeans++ initialization
+mu = attr(X,"scaled:center")
+sigma = attr(X,"scaled:scale")
+
+pca_sm = prcomp(social_trim, scale=TRUE, center = TRUE)
+pca_var <-  pca_sm$sdev ^ 2
+pca_var1 <- pca_var / sum(pca_var)
+
+varimax(pca_sm$rotation[, 1:11])$loadings
+scores = pca_sm$x
+pc_data <- as.data.frame(scores[,1:18])
+X <- pc_data
+
+
+
+
+# Determine number of clusters
+#Elbow Method for finding the optimal number of clusters
+#set.seed(123)
+# Compute and plot wss for k = 2 to k = 15.
+k.max <- 15
+data <- X 
+wss <- sapply(1:k.max, 
+              function(k){kmeans(data, k, nstart=50,iter.max = 15 )$tot.withinss})
+wss
+plot(1:k.max, wss,
+     type="b", pch = 19, frame = FALSE, 
+     xlab="Number of clusters K",
+     ylab="Total within-clusters sum of squares")
+
+# Look at four clusters
+clust_social = kmeanspp(X, k=4, nstart=25)
+social_clust1 <- cbind(social_trim, clust_social$cluster)
+
+library(cluster)
+library(HSAUR)
+library(fpc)
+library(lubridate)
+
+plotcluster(social_trim, clust_social$cluster)
+
+cluster_1 <- clust_social$center[1,]*sigma + mu
+cluster_2 <-clust_social$center[2,]*sigma + mu
+cluster_3 <-clust_social$center[3,]*sigma + mu
+cluster_4 <-clust_social$center[4,]*sigma + mu
+
+social_cluster <- cbind(cluster_1, cluster_2, cluster_3, cluster_4)
+
+social_cluster = as.data.frame(social_cluster)
+
+social_cluster$type <- row.names(social_cluster)
+
+social_cluster = social_cluster[-32,]
+# create plots for the four distinct different clusters
+ggplot(social_cluster, aes(x =reorder(type, -cluster_1) , y=cluster_1)) +
+  geom_bar(stat="identity", position ="dodge") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle=-40, hjust=.1)) + 
+  labs(title="Cluster 1",
+        x ="Category", y = "Cluster centre values")
+
+ggplot(social_cluster, aes(x =reorder(type, -cluster_2) , y=cluster_2)) +
+  geom_bar(stat="identity", position ="dodge") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle=-40, hjust=.1)) + 
+  labs(title="Cluster 2",
+        x ="Category", y = "Cluster centre values")
+
+ggplot(social_cluster, aes(x =reorder(type, -cluster_3) , y=cluster_3)) +
+  geom_bar(stat="identity", position ="dodge") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle=-40, hjust=.1)) + 
+  labs(title="Cluster 3",
+        x ="Category", y = "Cluster centre values")
+
+ggplot(social_cluster, aes(x =reorder(type, -cluster_4) , y=cluster_4)) +
+  geom_bar(stat="identity", position ="dodge") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle=-40, hjust=.1)) + 
+  labs(title="Cluster 4",
+        x ="Category", y = "Cluster centre values")
+
+```
+
+To understand NutrientH20's social-media audiance better and improve their messaging, I fit a  Kmeans++ clustering model to the relevant topics that tweets were sorted into. I did not include chatter, spam, photography, health nutrition, or adult because they were highly correlated to other features and did not offer much additional insight when looking at the four different clusters. The for clusters displayed in the plots above indicate four different social media marketing segments which are 
+
+1. travel, outdoors 
+2. current events, cooking, politics, college uni
+3. travel, sports fandom, outdoors
+4. politics, cooking, sport fandom, food
+
+Based on the K-Means clustering, there are four different clusters which seem to have an overlap in areas like sports fandom, traveling, and outdoors. These clusters seem to have various other interests including politics, cooking, current events, and college university. Given this information, I recommend for NutrientH20 to specify their social media marketing campaigns towards these specific topics.
+
+```{r eval=F, include=FALSE}
+# Now look at PCA of the (average) survey responses.  
+
+
+# This is a common way to treat survey data
+#PCAsocial = prcomp(social_trim, scale=TRUE)
+
+## variance plot
+#plot(PCAsocial)
+#summary(PCAsocial)
+
+# first few pcs
+# try interpreting the loadings
+# the question to ask is: "which variables does this load heavily on (positive and negatively)?"
+#round(PCAsocial$rotation[,1:3],2) 
+
+# create a tidy summary of the loadings
+#loadings_summary = PCAsocial$rotation %>%
+ # as.data.frame() %>%
+#  rownames_to_column('sports_fandom')
+
+# This seems to pick out characteristics of
+# well-received dramas with positive loadings?
+#loadings_summary %>%
+#  select(sports_fandom, PC1) %>%
+#  arrange(desc(PC1))
+
+# this just seems to load negatively on most things
+# honestly not sure!
+#loadings_summary %>%
+#  select(Question, PC2) %>%
+ # arrange(desc(PC2))
+
+# this looks clearly like a drama vs comedy axis
+#loadings_summary %>%
+#  select(Question, PC3) %>%
+#  arrange(desc(PC3))
+
+# Let's make some plots of the shows themselves in 
+# PC space, i.e. the space of summary variables we've created
+#shows = merge(shows, PCApilot$x[,1:3], by="row.names")
+#shows = rename(shows, Show = Row.names)
+
+# let's plot in PC1 space
+# We might feel good calling PC1 the "quality drama" PC
+#ggplot(shows) + 
+#	geom_col(aes(x=reorder(Show, PC1), y=PC1)) + 
+ # coord_flip()
+```
+
+Question 3: Revisit the notes on association rule mining and the R example on music playlists: playlists.R and playlists.csv. Then use the data on grocery purchases in groceries.txt and find some interesting association rules for these shopping baskets. The data file is a list of shopping baskets: one person's basket for each row, with multiple items per row separated by commas -- you'll have to cobble together a few utilities for processing this into the format expected by the "arules" package. Pick your own thresholds for lift and confidence; just be clear what these thresholds are and how you picked them. Do your discovered item sets make sense? Present your discoveries in an interesting and concise way.
+
+```{r echo=FALSE, warning=FALSE}
+# Load in groceries text
+library(tidyverse)
+library(arules) 
+library(arulesViz)
+# include sep = "," to seperate values by a comma
+groceries = read.delim("/Users/josephherrera/Desktop/ECO395M/data/groceries.txt", header = F)
+groceries = as.data.frame(groceries)
+```
+
+```{r echo=FALSE, warning=FALSE}
+
+lists <- strsplit(groceries$V1, split = ",")
+all_lists <- lapply(lists, unique)
+groceries_trans = as(all_lists, "transactions")
+
+# Now run the 'apriori' algorithm
+# Look at rules with support > .01 & confidence >.1 & length (# artists) <= 5
+grocery_rules = apriori(groceries_trans, 
+	parameter=list(support=.001, confidence=.1, maxlen=2))
+                         
+# Look at the output... so many rules!
+arules::inspect(grocery_rules)
+
+## Choose a subset
+arules::inspect(subset(grocery_rules, lift > 1))
+arules::inspect(subset(grocery_rules, confidence > 0.2))
+arules::inspect(subset(grocery_rules, lift > 1 & confidence > 0.05))
+
+# plot all the rules in (support, confidence) space
+# notice that high lift rules tend to have low support
+plot(grocery_rules)
+
+### Another set of rules
+grocrules_2 = apriori(groceries_trans, 
+                     parameter=list(support=0.0015, confidence=0.8, minlen=2))
+arules::inspect(grocrules_2)
+plot(grocrules_2)
+
+plot(head(grocrules_2, 5, by='lift'), method='graph')
+```
+
+To find some interesting association rules for different grocery baskets, I chose a 1.5% support rate, 80% confidence, and lift greater than 1 to focus on the goods that cause a have a high probablit of occuring if another good is bought. The graph for rules above whole milk and other vegetables are very likely to be bought in carts that are purchasing multiple goods. Also, bottled beer is likely to be purchased with other forms of alcohol, such as wine and liquor.
+
+
+
+Question 4: Revisit the Reuters C50 corpus that we explored in class. Your task is to build the best model you can, using any combination of tools you see fit, for predicting the author of an article on the basis of that article's textual content. Describe clearly what model you are using, how you constructed features, and so forth.
+
+Answer:
+The first step to creating a predictive model to match the author to their respective articles based on each article's textual content is to format the articles into a dataset that supervised techniques will accept. First, I loaded the data and used a wrapper function to indicate I wanted each article to be identified by the file name and be in English. As I read in the articles, I noticed that the Reuters C50 directory for training data has 50 other subdirectories, one per author, with 50 unique articles in each sub-directory. To extract all of the relevant information, I had to "glob" the file paths of all fifty sub-directories into a single object. Next, I took a substring of the authors' names and globbed the text files associated with each author's name. Then, I appended all of the file paths and authors' names. After creating this object, I turned it into a corpus, which contained 2500 elements, one for each of the 50 articles the 50 different authors wrote.
+
+The next step of preprocessing the data involved removing numbers, capitalization, punctuation, white space, and stop words using the content transformer function in the tm package. Next, I was able to turn my corpus into a document term matrix (DTM) and turned it into a data frame consisting of 2500 observations for N remaining number of terms. I also extracted a vector of the author's names by taking the file names for each article and cleaning the names until all that was left is the authors' names. Both the vector of authors' names and the matrix of terms have a length of 2500. Apply the same steps to the testing set data to get a matrix of length 2500 by the same number of features in the training matrix.
+
+
+
+
+
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(tm)
+library(gamlr)
+library(SnowballC)
+library(data.table)
+
+# Load data
+# Remember to source in the "reader" wrapper function
+# it's stored as a Github gist at:
+# https://gist.github.com/jgscott/28d9d1287a0c3c1477e2113f6758d5ff
+readerPlain = function(fname){
+				readPlain(elem=list(content=readLines(fname)), 
+							id=fname, language='en') }
+
+## Rolling two directories together into a single training corpus
+train_dirs = Sys.glob('/Users/josephherrera/Desktop/ECO395M/data/ReutersC50/C50train/*')
+train_dirs = train_dirs[c(1:50)]
+file_list = NULL
+labels_train = NULL
+for(author in train_dirs) {
+	author_name = substring(author, first=1)
+	files_to_add = Sys.glob(paste0(author, '/*.txt'))
+	file_list = append(file_list, files_to_add)
+	labels_train = append(labels_train, rep(author_name, length(files_to_add)))
+}
+train_dirs
+
+corpus_train = Corpus(DirSource(train_dirs)) 
+
+corpus_train = corpus_train %>% tm_map(., content_transformer(tolower)) %>% 
+        tm_map(., content_transformer(removeNumbers)) %>% 
+				tm_map(., content_transformer(removeNumbers)) %>% 
+				tm_map(., content_transformer(removePunctuation)) %>%
+				tm_map(., content_transformer(stripWhitespace)) %>%
+				tm_map(., content_transformer(removeWords), stopwords("SMART"))
+
+
+
+DTM_train = DocumentTermMatrix(corpus_train)
+DTM_train # some basic summary statistics
+
+# Parse out words in the bottom five percent of all terms
+DTM_train2 = removeSparseTerms(DTM_train, 0.95)
+DTM_train2
+
+# Data frame of 2500 variables and 641 variables (The first matrix is completed)
+DF_train <- data.frame(as.matrix(DTM_train2), stringsAsFactors=FALSE)
+
+
+# I need a vector of labels
+labels_train = append(labels_train, rep(author_name, length(files_to_add)))
+
+#Clean the label names
+author_names = labels_train %>%
+	{ strsplit(., '/', fixed=TRUE) } %>%
+	{ lapply(., tail, n=2) } %>%
+	{ lapply(., paste0, collapse = '') } %>%
+	unlist
+
+author_names = as.data.frame(author_names)
+
+author_names = gsub("C([0-9]+)train", "\\1", author_names$author_names)
+author_names = gsub("([0-9]+)", "", author_names)
+
+author_names = as.data.frame(author_names)
+
+
+####### Create predictive model using the training data
+
+
+
+
+```
+
+
+
+
+
+
+```{r echo=FALSE, warning=FALSE}
+############# Stuff for the testing set to be used after predictive modeling
+## Same operations with the testing corpus
+test_dirs = Sys.glob('/Users/josephherrera/Desktop/ECO395M/data/ReutersC50/C50test/*')
+test_dirs = test_dirs[c(1: 50)]
+file_list = NULL
+labels_test = NULL
+for(author in test_dirs) {
+	author_name = substring(author, first=1)
+	files_to_add = Sys.glob(paste0(author, '/*.txt'))
+	file_list = append(file_list, files_to_add)
+	labels_test = append(labels_test, rep(author_name, length(files_to_add)))
+}
+test_dirs
+
+corpus_test = Corpus(DirSource(test_dirs)) 
+
+corpus_test = corpus_test %>% tm_map(., content_transformer(tolower)) %>% 
+				tm_map(., content_transformer(removeNumbers)) %>% 
+				tm_map(., content_transformer(removePunctuation)) %>%
+				tm_map(., content_transformer(stripWhitespace)) %>%
+				tm_map(., content_transformer(removeWords), stopwords("SMART")) 
+
+# restrict test-set vocabulary to the terms in DTM_train
+DTM_test = DocumentTermMatrix(corpus_test,
+                               control = list(dictionary=Terms(DTM_train)))
+
+# Parse out words in the bottom five percent of all terms
+DTM_test2 = removeSparseTerms(DTM_test, 0.95)
+DTM_test2
+
+# Data frame of 2500 variables and 641 variables (The first matrix is completed)
+DF_test <- data.frame(as.matrix(DTM_test2), stringsAsFactors=FALSE)
+
+
+
+# restrict test-set vocabulary to the terms in DTM_train
+DTM_test = DocumentTermMatrix(corpus_test,
+                               control = list(dictionary=Terms(DTM_train)))
+
+#outcome vector
+y_train = author_names
+y_test = author_names
+
+y_train = as.data.frame(y_train)
+#is.finite(y_train)
+
+# lasso logistic regression for document classification
+#logit1 = cv.gamlr(DTM_train2, y_train, family='binomial', nfold=10)
+#coef(logit1, select='min') 
+#plot(coef(logit1))
+#yhat_test = predict(logit1, DTM_test2, type='response')
+
+#xtabs(~ {yhat_test > 0.5} + y_test)
+#boxplot(as.numeric(yhat_test) ~ y_test)
+```
+
+Finally, I used the PCA dimension reduction technique to turn the higher number of features into smaller principal components. I first took all of the columns filled with 0's out of the training and testing matrices and reduced the number of columns in these matrices to only use intersecting columns. Then, I ran PCA on the training data and used the model to predict authors' names in the testing data. Afterward, I plotted the principal components in a line graph and decided to use 265 principal components because they preserve approximately 75% of the variance in the original data.
+```{r echo=FALSE, warning=FALSE}
+####### Create predictive model using the training data
+# what models would I like to compare to one another????
+# I'm thinking Lasso, randomForest, and KNN
+
+# Use PCA to reduce the dimensions of the dataset
+# eliminate zerps in the data
+# Use already constructed data frames
+DF_train_1<-DF_train[,which(colSums(DF_train) != 0)] 
+DF_test_1<-DF_test[,which(colSums(DF_test) != 0)]
+
+# Only use intersecting columns
+DF_train_1 = DF_train_1[,intersect(colnames(DF_test_1),colnames(DF_train_1))]
+DF_test_1 = DF_test_1[,intersect(colnames(DF_test_1),colnames(DF_train_1))]
+
+# Extract Principal components
+mod_pca = prcomp(DF_train_1,scale=TRUE)
+pred_pca=predict(mod_pca,newdata = DF_test_1)
+
+# Find correct number of components
+plot(mod_pca,type='line') # I need to pick two components
+plot(mod_pca)
+var <- apply(mod_pca$x, 2, var)  
+prop <- var / sum(var)
+cumsum(prop)
+plot(cumsum(mod_pca$sdev^2/sum(mod_pca$sdev^2)))
+
+summary(mod_pca) 
+# PCA 256 has approximately 75% of the variance preserved
+```
+
+Using the 256 principal components, I took the original data points in the PCA predictive model ("mod_pca") in a data frame and did the same thing for the test data. These were named "train_class" and "test_class."
+
+```{r echo=FALSE, warning=FALSE}
+train_class = data.frame(mod_pca$x[,1:256])
+train_class['author']=labels_train
+train_load = mod_pca$rotation[,1:256]
+
+test_class_pre <- scale(DF_test_1) %*% train_load
+test_class <- as.data.frame(test_class_pre)
+test_class['author']=labels_test
+```
+
+Now, I can use supervised learning techniques. In particular, I am focusing on predictive models using a random forest and KNN. After using these techniques, I found the following results.
+
+```{r}
+# Run random forest 
+library(randomForest)
+train_class_forest = train_class 
+
+train_class_forest$author = factor(train_class_forest$author) 
+
+mod_rand = randomForest(author ~ . ,
+                           data=train_class_forest, importance = TRUE)
+# shows out-of-bag MSE as a function of the number of trees used
+#plot(load.forest)
+# let's compare RMSE on the test set
+modelr::rmse(author.forest, test_class)  # a lot lower!
+
+
+
+
+pre_rand<-predict(mod_rand,data=test_class)
+
+tab_rand<-as.data.frame(table(pre_rand,as.factor(test_class$author)))
+predicted<-pre_rand
+actual<-as.factor(test_class$author)
+temp<-as.data.frame(cbind(actual,predicted))
+temp$flag<-ifelse(temp$actual==temp$predicted,1,0)
+sum(temp$flag)
+#1757
+sum(temp$flag)*100/nrow(temp_knn)
+# 70.28%
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+# KNN classification method
+# Prepare the data
+train.X = subset(train_class, select = -c(author))
+test.X = subset(test_class,select=-c(author))
+train.author=as.factor(train_class$author)
+test.author=as.factor(test_class$author)
+```
+```{r}
+library(class)
+set.seed(1)
+knn_pred=knn(train.X,test.X,train.author,k=1)
+
+temp_knn=as.data.frame(cbind(knn_pred,test.author))
+temp_knn_flag<-ifelse(as.integer(knn_pred)==as.integer(test.author),1,0)
+sum(temp_knn_flag)
+
+## [1] 727
+
+sum(temp_knn_flag)*100/nrow(temp_knn) #802
+
+## [1] 29.08%
+
+
+```
+
+```{r}
+# Compare the out-of-sample accuracies
+comp<-data.frame("Model"=c("Random Forest","KNN"), "Test.accuracy"=c(70.8,19.1))
+comp
+ggplot(comp,aes(x=Model,y=Test.accuracy))+geom_col()
+```
+The more effective predictive model is the random forest, which outperformed the KNN model by almost 40%. 
+

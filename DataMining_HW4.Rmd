@@ -419,7 +419,10 @@ author_names = as.data.frame(author_names)
 author_names = gsub("C([0-9]+)train", "\\1", author_names$author_names)
 author_names = gsub("([0-9]+)", "", author_names)
 
+#author_names = author_names[-c(2501:2550),]
 author_names = as.data.frame(author_names)
+
+  
 
 
 ####### Create predictive model using the training data
@@ -527,7 +530,8 @@ Using the 256 principal components, I took the original data points in the PCA p
 
 ```{r echo=FALSE, warning=FALSE}
 train_class = data.frame(mod_pca$x[,1:256])
-train_class['author']=labels_train
+#author_names = author_names[-c(2501:2550),]
+train_class['author']=author_names
 train_load = mod_pca$rotation[,1:256]
 
 test_class_pre <- scale(DF_test_1) %*% train_load
@@ -549,7 +553,7 @@ mod_rand = randomForest(author ~ . ,
 # shows out-of-bag MSE as a function of the number of trees used
 #plot(load.forest)
 # let's compare RMSE on the test set
-modelr::rmse(author.forest, test_class)  # a lot lower!
+#modelr::rmse(mod_rand, test_class)  # a lot lower!
 
 
 
@@ -563,7 +567,7 @@ temp<-as.data.frame(cbind(actual,predicted))
 temp$flag<-ifelse(temp$actual==temp$predicted,1,0)
 sum(temp$flag)
 #1757
-sum(temp$flag)*100/nrow(temp_knn)
+sum(temp$flag)*100/2500
 # 70.28%
 ```
 

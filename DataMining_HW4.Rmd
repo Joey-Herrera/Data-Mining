@@ -91,36 +91,47 @@ X = scale(X, center=TRUE, scale=TRUE) # standardize the distance to not have uni
 mu = attr(X,"scaled:center") # mean
 sigma = attr(X,"scaled:scale") # Find the variance
 
-# First form a pairwise distance matrix
-#distance_between_wine = dist(X)
+#use clustering - KMEANS
 
-# Now run hierarchical clustering
-#h1 = hclust(distance_between_wine, method='centroid')
+wine_train = subset(wine, select = -c(color, quality))
 
-# Cut the tree into 10 clusters
-#cluster1 = cutree(h1, k=2)
-#summary(factor(cluster1))
-
+wine_train_scaled = scale(wine_train, center=TRUE, scale=TRUE)
+# Extract the centers and scales from the rescaled data (which are named attributes)
+mu = attr(wine_train_scaled,"scaled:center")
+sigma = attr(wine_train_scaled,"scaled:scale")
 # Using kmeans++ initialization
-clust2 = kmeanspp(X, k=2, nstart=25)
 
-clust2$center[1,]*sigma + mu
-clust2$center[2,]*sigma + mu
-#clust2$center[4,]*sigma + mu
+clust2 = kmeanspp(wine_train_scaled, k=2, nstart=25)
 
-# Which cars are in which clusters?
-which(clust2$cluster == 1)
-which(clust2$cluster == 2)
-#which(clust2$cluster == 3)
+wine_clustered = data.frame(wine, clust2$cluster)
 
-length(which(clust2$cluster == 1)) # 4854
-length(which(clust2$cluster == 2)) # 1643
+wine_clustered <- wine_clustered%>%
+  mutate(predicted = ifelse(clust2.cluster == 2, 1, 0))
+
+#RMSE of clustering
+mean((wine_clustered$predicted - wine_clustered$color)^2) %>% sqrt
+
+# What are the clusters?
+#clust1$center  # not super helpful
+#clust1$center[1,]*sigma + mu
+#clust1$center[2,]*sigma + mu
+
+
+
+# A few plots with cluster membership shown
+# qplot is in the ggplot2 library
+qplot(color, residual.sugar, data=wine, color=factor(clust2$cluster))
+
+
+#length(which(clust2$cluster == 1)) # 4854
+#length(which(clust2$cluster == 2)) # 1643
 
 # The actual divide of white and red wine
-sum(wine$color == "white") # 4898
+#sum(wine$color == "white") # 4898
 sum(wine$color == "red") # 1599
 ```
 
+Answer: After performing a PCA and K-Means clustering technique on the wine data, I believe that K-Means clustering is more effective at distinguishing red wine from white wine given the clustering technique's higher RMSE. Since the K-Means clustering technique only produces two different clusters, it will be ineffective at predicting the quality of a wine because there are more than two different clusters when predicting the quality of the wine.
 
 Question 2: Market Segmentation
 Your task to is analyze this data as you see fit, and to prepare a (short!) report for NutrientH20 that identifies any interesting market segments that appear to stand out in their social-media audience. You have complete freedom in deciding how to pre-process the data and how to define "market segment." (Is it a group of correlated interests? A cluster? A principal component? Etc. You decide the answer to this question---don't ask me!) Just use the data to come up with some interesting, well-supported insights about the audience and give your client some insight as to how they might position their brand to maximally appeal to each market segment.
